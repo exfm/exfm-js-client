@@ -1,12 +1,3 @@
-__get: (route, callback, data={}) ->
-    __makeRequest(route, data, callback, 'GET')
-
-__post: (route, callback, data={}) ->
-    __makeRequest(route, data, callback, 'POST')
-
-__makeRequest: (route, data, callback, method='GET') ->
-
-
 class ExfmClient
     @getUser: (username, callback)->
         __get "/user/#{username}", callback
@@ -86,14 +77,61 @@ class ExfmClient
 
         __ get route, callback, {start: start, results: results}
 
+module.exports = ExfmClient
 
+__get: (route, callback, data={}) ->
+    __makeRequest(route, data, callback, 'GET')
 
+__post: (route, callback, data={}) ->
+    __makeRequest(route, data, callback, 'POST')
 
+__makeRequestJquery: (route, data, callback, method='GET') ->
+    url = "http://ex.fm/api/v3#{route}?callback=?"
+    if method == 'GET'
+        $.get url, data, (data) ->
+            callback.apply this, data
+    else
+        $.post url, data, (data) ->
+            callback.apply this, data
 
+__makeRequestNode: (route, data, callback, method='GET') ->
+    path = "/api/v3#{route}"
 
+    if method is "GET"
+        path += "?" + querystring.stringify data
 
+    responseBuffer = ''
 
+    options =
+        host: 'ex.fm',
+        port: 80,
+        path: path
+        method: method
 
+    req = http.request options, (res) ->
+        res.on 'data', (chunk) ->
+            responseBuffer += chunk.toString()
 
+        res.on 'end', () ->
+            data = JSON.parse(responseBuffer)
+            if data.status_code != 200
+                throw data.status_text
 
+            callback.apply this, data
 
+        res.on 'error', (data) ->
+            console.log data
+
+    if method is "GET"
+        req.end()
+    else
+        req.end(data)
+
+if jQuery
+    __makeRequest = __makeRequestJquery
+else if require?
+    http = require('http')
+    querystring = require('querystring')
+    __makeRequest = __makeRequestNode
+else
+    throw ('Not node and not jquery.  Need another transport.')

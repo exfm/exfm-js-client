@@ -1,24 +1,5 @@
 (function() {
-  var ExfmClient;
-  ({
-    __get: function(route, callback, data) {
-      if (data == null) {
-        data = {};
-      }
-      return __makeRequest(route, data, callback, 'GET');
-    },
-    __post: function(route, callback, data) {
-      if (data == null) {
-        data = {};
-      }
-      return __makeRequest(route, data, callback, 'POST');
-    },
-    __makeRequest: function(route, data, callback, method) {
-      if (method == null) {
-        method = 'GET';
-      }
-    }
-  });
+  var ExfmClient, http, querystring, __makeRequest;
   ExfmClient = (function() {
     function ExfmClient() {}
     ExfmClient.getUser = function(username, callback) {
@@ -213,4 +194,81 @@
     };
     return ExfmClient;
   })();
+  module.exports = ExfmClient;
+  ({
+    __get: function(route, callback, data) {
+      if (data == null) {
+        data = {};
+      }
+      return __makeRequest(route, data, callback, 'GET');
+    },
+    __post: function(route, callback, data) {
+      if (data == null) {
+        data = {};
+      }
+      return __makeRequest(route, data, callback, 'POST');
+    },
+    __makeRequestJquery: function(route, data, callback, method) {
+      var url;
+      if (method == null) {
+        method = 'GET';
+      }
+      url = "http://ex.fm/api/v3" + route + "?callback=?";
+      if (method === 'GET') {
+        return $.get(url, data, function(data) {
+          return callback.apply(this, data);
+        });
+      } else {
+        return $.post(url, data, function(data) {
+          return callback.apply(this, data);
+        });
+      }
+    },
+    __makeRequestNode: function(route, data, callback, method) {
+      var options, path, req, responseBuffer;
+      if (method == null) {
+        method = 'GET';
+      }
+      path = "/api/v3" + route;
+      if (method === "GET") {
+        path += "?" + querystring.stringify(data);
+      }
+      responseBuffer = '';
+      options = {
+        host: 'ex.fm',
+        port: 80,
+        path: path,
+        method: method
+      };
+      req = http.request(options, function(res) {
+        res.on('data', function(chunk) {
+          return responseBuffer += chunk.toString();
+        });
+        res.on('end', function() {
+          data = JSON.parse(responseBuffer);
+          if (data.status_code !== 200) {
+            throw data.status_text;
+          }
+          return callback.apply(this, data);
+        });
+        return res.on('error', function(data) {
+          return console.log(data);
+        });
+      });
+      if (method === "GET") {
+        return req.end();
+      } else {
+        return req.end(data);
+      }
+    }
+  });
+  if (jQuery) {
+    __makeRequest = __makeRequestJquery;
+  } else if (typeof require !== "undefined" && require !== null) {
+    http = require('http');
+    querystring = require('querystring');
+    __makeRequest = __makeRequestNode;
+  } else {
+    throw 'Not node and not jquery.  Need another transport.';
+  }
 }).call(this);
